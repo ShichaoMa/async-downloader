@@ -23,13 +23,29 @@ class Source(object):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        进行资源关闭时使用
+        :param exc_type:
+        :param exc_val:
+        :param exc_tb:
+        :return:
+        """
         pass
 
     async def __anext__(self):
+        """
+        返回'{"url": "", "filename": ""}'
+        :return:
+        """
         return NotImplemented
 
     @staticmethod
     def enrich_parser(sub_parser):
+        """
+        需要专属命令行参数时需要实现
+        :param sub_parser:
+        :return:
+        """
         pass
 
 
