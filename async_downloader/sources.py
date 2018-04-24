@@ -63,6 +63,7 @@ class RedisSource(Source):
         sub_parser.add_argument("-rh", "--redis-host", default="0.0.0.0")
         sub_parser.add_argument("-rp", "--redis-port", default=6379)
         sub_parser.add_argument("-rk", "--redis-key", default="download_meta")
+        sub_parser.add_argument("--idle", action="store_true", help="Idle... ")
 
 
 class FileSource(Source):

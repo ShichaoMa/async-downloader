@@ -13,6 +13,7 @@ import aiofiles
 import traceback
 import async_timeout
 
+from functools import partial
 from argparse import ArgumentParser
 
 from .utils import *
@@ -29,24 +30,24 @@ class AsyncDownloader(object):
     """
     异步多协程下载器
     """
-    name = "downloader"
 
     def __init__(self):
         super(AsyncDownloader, self).__init__()
         self.sources = [globals()[k] for k in globals() if k.endswith("Source")]
         args = self.parse_args()
-        self.idle = args.idle
+        self.idle = getattr(args, "idle", False)
         self.workers = args.workers
+        self.proxy_auth = args.proxy_auth
         self.proxy = args.proxy
         self.generator = self.gen_task(
             globals()[args.source.capitalize() + "Source"](**vars(args)))
 
         if args.download:
-            self.download = load_function(args.download)
+            self.download = partial(load_function(args.download), self)
 
     @cache_property
     def logger(self):
-        logger = logging.getLogger(self.name)
+        logger = logging.getLogger(self.__class__.__name__)
         logger.setLevel(10)
         logger.addHandler(logging.StreamHandler(sys.stdout))
         return logger
@@ -61,7 +62,9 @@ class AsyncDownloader(object):
         base_parser.add_argument(
             "--proxy", default="http://127.0.0.1:8123", help="Proxy to use.")
         base_parser.add_argument(
-            "--idle", action="store_true", help="Idle... ")
+            "--proxy-auth", type=partial(str.split, seq=":", maxsplit=1),
+            help="Proxy auth: user:pass.")
+
         parser = ArgumentParser(description="Async downloader", add_help=False)
         parser.add_argument('-h', '--help', action=ArgparseHelper,
                             help='show this help message and exit. ')
@@ -77,8 +80,7 @@ class AsyncDownloader(object):
 
     def start(self):
         loop = asyncio.get_event_loop()
-        task = loop.create_task(
-            self.process(self.generator, self.workers, self.proxy, loop))
+        task = loop.create_task(self.process(loop))
         try:
             loop.run_until_complete(task)
         except KeyboardInterrupt:
@@ -87,27 +89,31 @@ class AsyncDownloader(object):
             loop.run_until_complete(asyncio.gather(task, stop_task))
             loop.close()
 
-    async def download(self, url, filename, proxy, chunk_size=1024000):
+    async def download(self, url, filename, chunk_size=1024000):
         """
         下载任务
         :param url:
         :param filename:
-        :param proxy:
         :param chunk_size:
         :return:
         """
         p, resp, session = None, None, None
-        # 规定时间内打开session获取到response，否则超时，一共最多尝试2次，其中一次使用代理。
+        # 规定时间内打开session获取到response，
+        # 否则超时，一共最多尝试2次，其中一次使用代理。
         for i in range(2):
             try:
+                if p and self.proxy_auth:
+                    proxy_auth = aiohttp.BasicAuth(*self.proxy_auth)
+                else:
+                    proxy_auth = None
                 async with async_timeout.timeout(20):
                     session = aiohttp.request("get", url, headers=headers,
-                                              proxy=p)
+                                              proxy=p, proxy_auth=proxy_auth)
                     resp = await session.__aenter__()
                 break
             except Exception:
                 traceback.print_exc()
-                p = proxy
+                p = self.proxy
 
         if resp:
             # 下载文件。
@@ -134,7 +140,8 @@ class AsyncDownloader(object):
         else:
             self.logger.error("Error occurred.")
 
-    async def gen_task(self, source):
+    @staticmethod
+    async def gen_task(source):
         # 预激专用，预激操作不返回有用的数据。
         yield
         async with source as iterable:
@@ -149,18 +156,18 @@ class AsyncDownloader(object):
         yield
         yield "exit"
 
-    async def process(self, generator, count, proxy, loop):
+    async def process(self, loop):
         self.logger.info("Start process tasks. ")
         # 预激
-        await generator.asend(None)
-        i = count
+        await self.generator.asend(None)
+        i = self.workers
         tasks = []
         alive = True
         # 当没有关闭或者有任务时，会继续循环
         while alive or tasks:
             # 当任务未满且未关闭时，才会继续产生新任务
             while i > 0 and alive:
-                data = await generator.asend(True)
+                data = await self.generator.asend(True)
                 # 返回exit表示要退出了
                 if data == "exit":
                     alive = False
@@ -168,7 +175,7 @@ class AsyncDownloader(object):
                 elif data:
                     i -= 1
                     self.logger.debug(f"Start task {data['filename']}. ")
-                    task = loop.create_task(self.download(proxy=proxy, **data))
+                    task = loop.create_task(self.download(**data))
                     tasks.append(task)
                 # 否则休息一秒钟
                 else:
@@ -190,7 +197,7 @@ class AsyncDownloader(object):
             if not (tasks or self.idle):
                 alive = False
         self.logger.info("Process stopped. ")
-        await generator.aclose()
+        await self.generator.aclose()
 
 
 def main():
