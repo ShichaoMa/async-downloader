@@ -114,12 +114,11 @@ class AsyncDownloader(object):
             except Exception:
                 traceback.print_exc()
                 p = self.proxy
-
-        if resp:
-            # 下载文件。
-            total = int(resp.headers.get("Content-Length", 0))
-            if total:
-                try:
+        try:
+            if resp:
+                # 下载文件。
+                total = int(resp.headers.get("Content-Length", 0))
+                if total:
                     recv = 0
                     async with aiofiles.open(filename, "wb") as f:
                         chunk = await resp.content.read(chunk_size)
@@ -131,14 +130,15 @@ class AsyncDownloader(object):
                             await f.write(chunk)
                             chunk = await resp.content.read(chunk_size)
                         self.logger.info("Download finished. ")
-                finally:
-                    # 关闭session。
-                    await session.__aexit__(*sys.exc_info())
-                    self.logger.debug("Coroutine closed. ")
+
+                else:
+                    self.logger.info(f"Haven't got any data from {url}. ")
             else:
-                self.logger.info(f"Haven't got any data from {url}. ")
-        else:
-            self.logger.error("Error occurred.")
+                self.logger.error("Error occurred.")
+        finally:
+            # 关闭session。
+            await session.__aexit__(*sys.exc_info())
+            self.logger.debug("Coroutine closed. ")
 
     @staticmethod
     async def gen_task(source):
