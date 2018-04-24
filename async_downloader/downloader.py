@@ -179,6 +179,8 @@ class AsyncDownloader(object):
                     tasks.append(task)
                 # 否则休息一秒钟
                 else:
+                    if not self.idle:
+                        break
                     self.logger.debug("Haven't got tasks. ")
                     await asyncio.sleep(1)
             # 清除完成的任务

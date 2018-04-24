@@ -32,4 +32,4 @@ usage: a-download cmdline [-h] --workers WORKERS [--download DOWNLOAD]
 参见RedisSource和FileSource等实现
 
 可以指定一个download函数，如function[模块].download[函数]，提供自定义下载行为。
-download函数必须是一个异步函数参数列表为url, filename, proxy, chunk_size
+download函数必须是一个异步函数参数列表为self, url, filename, chunk_size
