@@ -1,9 +1,10 @@
 # -*- coding:utf-8 -*-
+import json
 import aiofiles
 import warnings
 
 
-__all__ = ["FileSource", "RedisSource"]
+__all__ = ["FileSource", "RedisSource", "CmdlineSource"]
 
 
 class Source(object):
@@ -26,6 +27,10 @@ class Source(object):
 
     async def __anext__(self):
         return NotImplemented
+
+    @staticmethod
+    def enrich_parser(sub_parser):
+        pass
 
 
 class RedisSource(Source):
@@ -80,4 +85,27 @@ class FileSource(Source):
 
     @staticmethod
     def enrich_parser(sub_parser):
-        sub_parser.add_argument("--path", required=True)
+        sub_parser.add_argument(
+            "--path", required=True, help="Path of file which store "
+                                          "download meta in json lines. ")
+
+
+class CmdlineSource(Source):
+    """
+    command line source
+    """
+    def __init__(self, filename, url, **kwargs):
+        self.filename = filename
+        self.url = url
+        self.fired = False
+
+    async def __anext__(self):
+        if not self.fired:
+            self.fired = True
+            return json.dumps({"url": self.url, "filename": self.filename})
+
+    @staticmethod
+    def enrich_parser(sub_parser):
+        sub_parser.add_argument(
+            "--filename", required=True, help="Filename to save file. ")
+        sub_parser.add_argument("--url", required=True, help="Download url. ")

@@ -34,8 +34,8 @@ class AsyncDownloader(object):
     def __init__(self):
         super(AsyncDownloader, self).__init__()
         self.sources = [globals()[k] for k in globals() if k.endswith("Source")]
-
         args = self.parse_args()
+        self.idle = args.idle
         self.workers = args.workers
         self.proxy = args.proxy
         self.generator = self.gen_task(
@@ -60,16 +60,17 @@ class AsyncDownloader(object):
             "--download", help="Download method, async needed. ")
         base_parser.add_argument(
             "--proxy", default="http://127.0.0.1:8123", help="Proxy to use.")
+        base_parser.add_argument(
+            "--idle", action="store_true", help="Idle... ")
         parser = ArgumentParser(description="Async downloader", add_help=False)
         parser.add_argument('-h', '--help', action=ArgparseHelper,
                             help='show this help message and exit. ')
         sub_parsers = parser.add_subparsers(dest="source", help="Source. ")
 
         for source in self.sources:
-            name = source.__name__
             sub_parser = sub_parsers.add_parser(
-                name.replace("Source", "").lower(),
-                parents=[base_parser], help=name + ". ")
+                source.__name__.replace("Source", "").lower(),
+                parents=[base_parser], help=source.__doc__)
             source.enrich_parser(sub_parser)
 
         return parser.parse_args()
@@ -79,7 +80,7 @@ class AsyncDownloader(object):
         task = loop.create_task(
             self.process(self.generator, self.workers, self.proxy, loop))
         try:
-            loop.run_forever()
+            loop.run_until_complete(task)
         except KeyboardInterrupt:
             # 发送一个False，使用异步生成器跳出循环
             stop_task = loop.create_task(self.generator.asend(False))
@@ -185,6 +186,9 @@ class AsyncDownloader(object):
                 await asyncio.sleep(1)
             # 用来减缓任务队列有但不满且要关闭时产生的大量循环。
             await asyncio.sleep(.1)
+            # 如果没有任务且不请允许空转，则停止程序。
+            if not (tasks or self.idle):
+                alive = False
         self.logger.info("Process stopped. ")
         await generator.aclose()
 
