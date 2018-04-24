@@ -160,20 +160,20 @@ class AsyncDownloader(object):
         self.logger.info("Start process tasks. ")
         # 预激
         await self.generator.asend(None)
-        i = self.workers
+        free_workers = self.workers
         tasks = []
         alive = True
         # 当没有关闭或者有任务时，会继续循环
         while alive or tasks:
             # 当任务未满且未关闭时，才会继续产生新任务
-            while i > 0 and alive:
+            while free_workers > 0 and alive:
                 data = await self.generator.asend(True)
                 # 返回exit表示要退出了
                 if data == "exit":
                     alive = False
                 # 有data证明有下载任务
                 elif data:
-                    i -= 1
+                    free_workers -= 1
                     self.logger.debug(f"Start task {data['filename']}. ")
                     task = loop.create_task(self.download(**data))
                     tasks.append(task)
@@ -184,14 +184,14 @@ class AsyncDownloader(object):
                     self.logger.debug("Haven't got tasks. ")
                     await asyncio.sleep(1)
             # 清除完成的任务
-            l = len(tasks) - 1
-            while l >= 0:
-                if tasks[l].done():
-                    tasks.pop(l)
-                    i += 1
-                l -= 1
+            task_index = len(tasks) - 1
+            while task_index >= 0:
+                if tasks[task_index].done():
+                    tasks.pop(task_index)
+                    free_workers += 1
+                task_index -= 1
             # 任务队列是满的，休息一秒钟
-            if not i:
+            if not free_workers:
                 await asyncio.sleep(1)
             # 用来减缓任务队列有但不满且要关闭时产生的大量循环。
             await asyncio.sleep(.1)
