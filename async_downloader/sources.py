@@ -39,6 +39,9 @@ class Source(object):
         """
         return NotImplemented
 
+    async def push_back(self, data):
+        pass
+
     @staticmethod
     def enrich_parser(sub_parser):
         """
@@ -73,6 +76,9 @@ class RedisSource(Source):
         :return:
         """
         return self.redis_conn.lpop(self.redis_key)
+
+    async def push_back(self, data):
+        self.redis_conn.rpush(self.redis_key, data)
 
     @staticmethod
     def enrich_parser(sub_parser):

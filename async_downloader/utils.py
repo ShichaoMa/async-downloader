@@ -62,6 +62,21 @@ def cache_property(func):
     return wrapper
 
 
+async def readexactly(steam, n):
+    if steam._exception is not None:
+        raise steam._exception
+
+    blocks = []
+    while n > 0:
+        block = await steam.read(n)
+        if not block:
+            break
+        blocks.append(block)
+        n -= len(block)
+
+    return b''.join(blocks)
+
+
 def find_source():
     sys.path.insert(0, os.getcwd())
     try:
