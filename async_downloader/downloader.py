@@ -79,6 +79,7 @@ class AsyncDownloader(object):
         try:
             loop.run_until_complete(task)
         except KeyboardInterrupt:
+            self.logger.info("Wait to close...")
             # 发送一个False，使用异步生成器跳出循环
             stop_task = loop.create_task(self.generator.asend(False))
             loop.run_until_complete(asyncio.gather(task, stop_task))

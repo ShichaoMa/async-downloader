@@ -34,7 +34,7 @@ async def download(self, url, filename, *, sessions=dict()):
     """
     if not sessions:
         sessions["session"] = aiohttp.ClientSession(
-            conn_timeout=10, read_timeout=None)
+            conn_timeout=10, read_timeout=36000)
 
     session = sessions["session"]
     p = None
