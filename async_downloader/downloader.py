@@ -11,10 +11,9 @@ import asyncio
 
 from functools import partial
 from argparse import ArgumentParser
-from collections.abc import Coroutine
 
 from .sources import *
-from .download_engines import DownloadEngine
+from .download_engines import DownloadWrapper, download
 from .utils import load_function, cache_property, ArgparseHelper, find_source
 
 
@@ -38,14 +37,8 @@ class AsyncDownloader(object):
         self.proxy = args.proxy
         self.source = globals()[args.source.capitalize() + "Source"](**vars(args))
         self.generator = self.gen_task(self.source)
-
-        if args.download:
-            engine = load_function(args.download)
-            if isinstance(engine, type):
-                engine = engine()
-        else:
-            engine = DownloadEngine()
-        self.download = partial(engine, self)
+        self.download = DownloadWrapper(
+            load_function(args.download) or download, self)
 
     @cache_property
     def logger(self):
@@ -89,9 +82,6 @@ class AsyncDownloader(object):
             # 发送一个False，使用异步生成器跳出循环
             stop_task = loop.create_task(self.generator.asend(False))
             loop.run_until_complete(asyncio.gather(task, stop_task))
-            # 关闭download下载资源。
-            if isinstance(self.download.func, Coroutine):
-                loop.run_until_complete(loop.create_task(self.download.func))
             loop.close()
 
     @staticmethod
@@ -149,9 +139,10 @@ class AsyncDownloader(object):
                 await asyncio.sleep(1)
             # 用来减缓任务队列有但不满且要关闭时产生的大量循环。
             await asyncio.sleep(.1)
-            # 如果没有任务且不请允许空转且上一次循环未发现任务，则停止程序。
+            # 如果没有任务且不允许空转且上一次循环未发现任务，则停止程序。
             if not (tasks or self.idle or got_task):
                 alive = False
+        await self.download.close()
         self.logger.info("Process stopped. ")
         await self.generator.aclose()
 

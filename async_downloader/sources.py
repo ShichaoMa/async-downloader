@@ -40,6 +40,11 @@ class Source(object):
         return NotImplemented
 
     async def push_back(self, data):
+        """
+        下载失败后的回收下载任务的机制
+        :param data:
+        :return:
+        """
         pass
 
     @staticmethod

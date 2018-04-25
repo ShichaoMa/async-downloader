@@ -42,6 +42,8 @@ def load_function(function_str):
     :param function_str: module1.module2.function
     :return: function
     """
+    if not function_str:
+        return
     mod_str, _sep, function_str = function_str.rpartition('.')
     return getattr(__import__(
         mod_str, fromlist=mod_str.split(".")[-1]), function_str)
