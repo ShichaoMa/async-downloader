@@ -23,17 +23,20 @@ class DownloadWrapper(object):
         return self.download(self.instance, *args, **kwargs)
 
 
-async def download(
-        self, url, filename, *,
-        session=aiohttp.ClientSession(conn_timeout=10, read_timeout=None)):
+async def download(self, url, filename, *, sessions=dict()):
     """
     下载任务
     :param self:
     :param url:
     :param filename:
-    :param session:
+    :param sessions:
     :return:
     """
+    if not sessions:
+        sessions["session"] = aiohttp.ClientSession(
+            conn_timeout=10, read_timeout=None)
+
+    session = sessions["session"]
     p = None
     # 出现异常后最多尝试2次，其中一次使用代理。
     for i in range(2):
@@ -73,8 +76,22 @@ async def download(
             os.unlink(filename)
         return json.dumps({"url": url, "filename": filename})
 
+
+def closure(sessions):
+    """
+    增加这个闭包方法只是为了闭包sessions，
+    因为sessions创建之初是空的，无法取得session的close方法。
+    :param sessions:
+    :return:
+    """
+    async def close():
+        c = getattr(sessions.pop("session", None), "close", None)
+        if c:
+            await c()
+    return close
+
 # 为download函数提供一个close属性，用来回收资源。
-download.close = download.__kwdefaults__["session"].close
+download.close = closure(download.__kwdefaults__["sessions"])
 
 
 class DownloadEngine(Coroutine):
