@@ -5,7 +5,6 @@ import aiohttp
 import aiofiles
 import traceback
 
-from collections.abc import Coroutine
 from .utils import readexactly
 
 
@@ -23,7 +22,7 @@ class DownloadWrapper(object):
         return self.download(self.instance, *args, **kwargs)
 
 
-async def download(self, url, filename, *, sessions=dict()):
+async def download(self, url, filename):
     """
     下载任务
     :param self:
@@ -32,24 +31,20 @@ async def download(self, url, filename, *, sessions=dict()):
     :param sessions:
     :return:
     """
-    if not sessions:
-        sessions["session"] = aiohttp.ClientSession(
-            conn_timeout=10, read_timeout=36000)
-
-    session = sessions["session"]
-    p = None
-    # 出现异常后最多尝试2次，其中一次使用代理。
-    for i in range(2):
-        try:
-            if p and self.proxy_auth:
-                proxy_auth = aiohttp.BasicAuth(*self.proxy_auth)
-            else:
-                proxy_auth = None
-            async with session.request(
-                    "GET", url,
-                    headers=self.headers,
-                    proxy=p,
-                    proxy_auth=proxy_auth) as resp:
+    async with aiohttp.ClientSession(conn_timeout=10, read_timeout=36000) as session:
+        p = None
+        # 出现异常后最多尝试2次，其中一次使用代理。
+        for i in range(2):
+            try:
+                if p and self.proxy_auth:
+                    proxy_auth = aiohttp.BasicAuth(*self.proxy_auth)
+                else:
+                    proxy_auth = None
+                resp = await session.request(
+                        "GET", url,
+                        headers=self.headers,
+                        proxy=p,
+                        proxy_auth=proxy_auth)
                 # 下载文件。
                 total = int(resp.headers.get("Content-Length", 0))
                 if total and resp.status < 300:
@@ -67,29 +62,11 @@ async def download(self, url, filename, *, sessions=dict()):
 
                 else:
                     raise RuntimeError(f"Haven't got any data from {url}. ")
-            break
-        except Exception:
-            self.logger.error("Error: " + "".join(traceback.format_exc()))
-            p = self.proxy
-    else:
-        if os.path.exists(filename):
-            os.unlink(filename)
-        return json.dumps({"url": url, "filename": filename})
-
-
-def closure(sessions):
-    """
-    增加这个闭包方法只是为了闭包sessions，
-    因为sessions创建之初是空的，无法取得session的close方法。
-    :param sessions:
-    :return:
-    """
-    async def close():
-        c = getattr(sessions.pop("session", None), "close", None)
-        if c:
-            await c()
-    return close
-
-
-# 为download函数提供一个close属性，用来回收资源。
-download.close = closure(download.__kwdefaults__["sessions"])
+                break
+            except Exception:
+                self.logger.error("Error: " + "".join(traceback.format_exc()))
+                p = self.proxy
+        else:
+            if os.path.exists(filename):
+                os.unlink(filename)
+            return json.dumps({"url": url, "filename": filename})
