@@ -70,7 +70,9 @@ class AsyncDownloader(object):
                 source.__name__.replace("Source", "").lower(),
                 parents=[base_parser], help=source.__doc__)
             source.enrich_parser(sub_parser)
-
+        if len(sys.argv) < 2:
+            parser.print_help()
+            exit(1)
         return parser.parse_args()
 
     def start(self):
