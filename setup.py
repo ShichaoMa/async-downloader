@@ -1,37 +1,45 @@
 # -*- coding:utf-8 -*-
+import re
+import os
 try:
     from setuptools import setup, find_packages
 except:
     from distutils.core import setup
 
 
-VERSION = '0.1.6'
+def get_version(package):
+    """
+    Return package version as listed in `__version__` in `__init__.py`.
+    """
+    init_py = open(os.path.join(package, '__init__.py')).read()
+    mth = re.search("__version__\s?=\s?['\"]([^'\"]+)['\"]", init_py)
+    if mth:
+        return mth.group(1)
+    else:
+        raise RuntimeError("Cannot find version!")
 
-AUTHOR = "cn"
 
-AUTHOR_EMAIL = "cnaafhvk@foxmail.com"
-
-URL = "https://www.github.com/ShichaoMa/async-downloader"
-
-NAME = "async-downloader"
-
-DESCRIPTION = "mutil file download from custom sources. "
+def install_requires():
+    """
+    Return requires in requirements.txt
+    :return:
+    """
+    try:
+        with open("requirements.txt") as f:
+            return [line.strip() for line in f.readlines() if line.strip()]
+    except OSError:
+        return []
 
 try:
     LONG_DESCRIPTION = open("README.rst").read()
 except UnicodeDecodeError:
     LONG_DESCRIPTION = open("README.rst", encoding="utf-8").read()
 
-KEYWORDS = "download async"
-
-LICENSE = "MIT"
-
-PACKAGES = ["async_downloader"]
 
 setup(
-    name=NAME,
-    version=VERSION,
-    description=DESCRIPTION,
+    name="async-downloader",
+    version=get_version("async_downloader"),
+    description="mutil file download from custom sources. ",
     long_description=LONG_DESCRIPTION,
     classifiers=[
         'License :: OSI Approved :: MIT License',
@@ -44,13 +52,13 @@ setup(
             'a-download = async_downloader:main',
         ],
     },
-    keywords=KEYWORDS,
-    author=AUTHOR,
-    author_email=AUTHOR_EMAIL,
-    url=URL,
-    license=LICENSE,
-    packages=PACKAGES,
-    install_requires=["aiofiles", "aiohttp"],
+    keywords="download async",
+    author="cn",
+    author_email="cnaafhvk@foxmail.com",
+    url="https://www.github.com/ShichaoMa/async-downloader",
+    license="MIT",
+    packages=find_packages(),
+    install_requires=install_requires(),
     include_package_data=True,
     zip_safe=True,
 )

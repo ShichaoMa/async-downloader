@@ -13,7 +13,7 @@ from functools import partial
 from argparse import ArgumentParser
 
 from .sources import *
-from .download_engines import DownloadWrapper, download
+from .download_engines import DownloadWrapper
 from .utils import load_function, cache_property, ArgparseHelper, find_source
 
 
@@ -37,8 +37,7 @@ class AsyncDownloader(object):
         self.proxy = args.proxy
         self.source = globals()[args.source.capitalize() + "Source"](**vars(args))
         self.generator = self.gen_task(self.source)
-        self.download = DownloadWrapper(
-            load_function(args.download) or download, self)
+        self.download = DownloadWrapper(load_function(args.download), self)
 
     @cache_property
     def logger(self):
