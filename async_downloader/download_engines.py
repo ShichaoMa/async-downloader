@@ -133,7 +133,7 @@ class DownloaderEngine(object):
                     "GET", url, headers=headers, **self.get_proxy())
                 return bool(resp.headers.get('Content-Range'))
             except Exception as e:
-                self.downloader.error(f"Failed to check: {e}")
+                self.downloader.logger.error(f"Failed to check: {e}")
                 if self.tries < 2:
                     self.tries += 1
                 else:
